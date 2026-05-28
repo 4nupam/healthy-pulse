@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Antigravity Food Scanner",
+    "slug": "antigravity-food-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Antigravity Food Scanner needs camera access to scan and identify food items for nutritional analysis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.antigravityfoodscanner"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Antigravity Food Scanner to access your camera for food scanning."
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}

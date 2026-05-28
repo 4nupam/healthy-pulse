@@ -20,9 +20,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database ─────────────────────────────────────────────────────────
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/food_scanner"
-    )
+    DATABASE_URL: str = "sqlite+aiosqlite:///./food_scanner.db"
 
     # ── AI / Model ───────────────────────────────────────────────────────
     MODEL_PATH: str = "./models/food_detector.onnx"

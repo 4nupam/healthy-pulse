@@ -48,10 +48,14 @@ export default function App() {
       setPermState(PermState.LOADING);
     } else if (permission.granted) {
       setPermState(PermState.GRANTED);
+    } else if (permission.canAskAgain && permission.status !== "denied") {
+      // Automatically request permission on first launch
+      requestPermission();
+      setPermState(PermState.LOADING);
     } else {
       setPermState(PermState.DENIED);
     }
-  }, [permission]);
+  }, [permission, requestPermission]);
 
   // ── Skeleton Pulse ────────────────────────────────────────────────────
   useEffect(() => {

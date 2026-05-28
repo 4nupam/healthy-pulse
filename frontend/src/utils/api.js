@@ -11,7 +11,7 @@ import axios from "axios";
 // Update this to your machine's local network IP when testing on a physical
 // device. Use "http://localhost:8000" for iOS simulator or
 // "http://10.0.2.2:8000" for Android emulator.
-const BASE_URL = "http://192.168.1.45:8000";
+const BASE_URL = "http://localhost:8000";
 const REQUEST_TIMEOUT_MS = 10000; // 10-second gateway timeout
 
 // ── Axios Instance ──────────────────────────────────────────────────────────

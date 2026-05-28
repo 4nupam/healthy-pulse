@@ -20,19 +20,16 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 # ── Async Engine ─────────────────────────────────────────────────────────────
-# Production-tuned pool parameters:
-#   pool_size=20      → 20 persistent connections in the pool
-#   max_overflow=10   → up to 10 additional connections under burst load
-#   pool_pre_ping=True→ test connections before checkout (handles stale conns)
-#   pool_recycle=3600 → recycle connections after 1 hour to avoid DB timeouts
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=settings.DEBUG,
-)
+engine_kwargs = {"echo": settings.DEBUG}
+if not settings.DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,
+    })
+
+engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # ── Session Factory ──────────────────────────────────────────────────────────
 async_session_factory = async_sessionmaker(

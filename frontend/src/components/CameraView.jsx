@@ -18,11 +18,18 @@ import {
   Text,
   View,
 } from "react-native";
-import { CameraView as ExpoCameraView, CameraType } from "expo-camera";
+import { CameraView as ExpoCameraView } from "expo-camera";
+import { Zap, ZapOff, RefreshCcw, ScanLine } from "lucide-react-native";
+import Svg, { Defs, Mask, Rect } from "react-native-svg";
+import * as Haptics from "expo-haptics";
 
 // ── Flash Mode Cycle ────────────────────────────────────────────────────────
 const FLASH_MODES = ["off", "on", "auto"];
-const FLASH_ICONS = { off: "⚡️✕", on: "⚡️", auto: "⚡️A" };
+const FlashIcon = ({ mode, color }) => {
+  if (mode === "off") return <ZapOff size={24} color={color} />;
+  if (mode === "on") return <Zap size={24} color={color} />;
+  return <Zap size={24} color={color} fill={color} />; // Auto
+};
 
 export default function CameraView({ onCapture, disabled = false }) {
   const cameraRef = useRef(null);
@@ -32,6 +39,7 @@ export default function CameraView({ onCapture, disabled = false }) {
 
   // ── Flash Toggle ────────────────────────────────────────────────────────
   const cycleFlash = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFlashMode((current) => {
       const idx = FLASH_MODES.indexOf(current);
       return FLASH_MODES[(idx + 1) % FLASH_MODES.length];
@@ -40,11 +48,13 @@ export default function CameraView({ onCapture, disabled = false }) {
 
   // ── Camera Flip ─────────────────────────────────────────────────────────
   const flipCamera = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFacing((current) => (current === "back" ? "front" : "back"));
   }, []);
 
   // ── Shutter Animation ──────────────────────────────────────────────────
   const animateShutter = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Animated.sequence([
       Animated.timing(shutterScale, {
         toValue: 0.85,
@@ -82,7 +92,7 @@ export default function CameraView({ onCapture, disabled = false }) {
   }, [disabled, onCapture, animateShutter]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-black">
       {/* ── Camera Preview ─────────────────────────────────────────────── */}
       <ExpoCameraView
         ref={cameraRef}
@@ -92,251 +102,101 @@ export default function CameraView({ onCapture, disabled = false }) {
       />
 
       {/* ── Top Gradient Overlay ───────────────────────────────────────── */}
-      <View style={styles.topOverlay}>
+      <View className="absolute top-0 left-0 right-0 pt-[60px] px-5 pb-5 bg-black/45 flex-row justify-between items-center z-10">
         {/* App Title */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.titleIcon}>🔬</Text>
-          <Text style={styles.titleText}>Antigravity</Text>
+        <View className="flex-row items-center gap-2">
+          <ScanLine size={24} color="#22d3ee" strokeWidth={2.5} />
+          <Text className="text-scanner-accent text-lg font-bold tracking-wide">
+            Antigravity
+          </Text>
         </View>
 
         {/* Top Controls */}
-        <View style={styles.topControls}>
+        <View className="flex-row gap-3">
           {/* Flash Toggle */}
           <Pressable
             onPress={cycleFlash}
-            style={({ pressed }) => [
-              styles.controlButton,
-              pressed && styles.controlButtonPressed,
-            ]}
+            className="w-11 h-11 rounded-full bg-white/15 justify-center items-center border border-white/20 active:bg-white/30"
             accessibilityLabel={`Flash ${flashMode}`}
             accessibilityRole="button"
           >
-            <Text style={styles.controlButtonText}>
-              {FLASH_ICONS[flashMode]}
-            </Text>
+            <FlashIcon mode={flashMode} color="#fff" />
           </Pressable>
 
           {/* Flip Camera */}
           <Pressable
             onPress={flipCamera}
-            style={({ pressed }) => [
-              styles.controlButton,
-              pressed && styles.controlButtonPressed,
-            ]}
+            className="w-11 h-11 rounded-full bg-white/15 justify-center items-center border border-white/20 active:bg-white/30"
             accessibilityLabel="Flip camera"
             accessibilityRole="button"
           >
-            <Text style={styles.controlButtonText}>🔄</Text>
+            <RefreshCcw size={22} color="#fff" />
           </Pressable>
         </View>
       </View>
 
-      {/* ── Crosshair Overlay ──────────────────────────────────────────── */}
-      <View style={styles.crosshairContainer} pointerEvents="none">
-        <View style={styles.crosshairBox}>
-          {/* Corner brackets */}
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+      {/* ── Scanner Cutout Overlay ───────────────────────────────────────── */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none" className="z-5">
+        <Svg height="100%" width="100%">
+          <Defs>
+            <Mask id="scanner-mask" x="0" y="0" height="100%" width="100%">
+              {/* Everything white is kept, black is cut out */}
+              <Rect height="100%" width="100%" fill="#fff" />
+              {/* The transparent hole in the middle */}
+              <Rect x="10%" y="22%" width="80%" height="45%" fill="black" rx="32" ry="32" />
+            </Mask>
+          </Defs>
+          {/* Dark overlay filling the screen */}
+          <Rect height="100%" width="100%" fill="rgba(0,0,0,0.65)" mask="url(#scanner-mask)" />
+
+          {/* Scanner Frame Border */}
+          <Rect
+            x="10%"
+            y="22%"
+            width="80%"
+            height="45%"
+            fill="none"
+            stroke="#22d3ee"
+            strokeWidth="3"
+            rx="32"
+            ry="32"
+            strokeDasharray="40 20"
+          />
+        </Svg>
+
+        <View className="absolute top-[70%] left-0 right-0 items-center">
+          <View className="bg-black/50 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+            <Text className="text-white/90 text-sm font-medium tracking-wide">
+              Center the food item in frame
+            </Text>
+          </View>
         </View>
-        <Text style={styles.crosshairHint}>
-          Center the food item in frame
-        </Text>
       </View>
 
       {/* ── Bottom Controls ────────────────────────────────────────────── */}
-      <View style={styles.bottomOverlay}>
+      <View className="absolute bottom-0 left-0 right-0 pb-[50px] pt-6 bg-black/50 items-center z-10">
         {/* Shutter Button */}
         <Animated.View
-          style={[
-            styles.shutterOuter,
-            { transform: [{ scale: shutterScale }] },
-          ]}
+          style={{ transform: [{ scale: shutterScale }] }}
+          className="w-20 h-20 rounded-full border-[4px] border-white/80 justify-center items-center p-1"
         >
           <Pressable
             onPress={handleCapture}
             disabled={disabled}
-            style={({ pressed }) => [
-              styles.shutterInner,
-              pressed && styles.shutterPressed,
-              disabled && styles.shutterDisabled,
-            ]}
+            className={`w-full h-full rounded-full bg-white/90 justify-center items-center active:bg-scanner-accent ${
+              disabled ? "opacity-50" : ""
+            }`}
             accessibilityLabel="Capture photo"
             accessibilityRole="button"
           >
-            <View style={styles.shutterDot} />
+            <View className="w-5 h-5 rounded-full bg-red-500 shadow-md" />
           </Pressable>
         </Animated.View>
 
-        <Text style={styles.captureHint}>
+        <Text className="text-white/60 text-sm mt-4 tracking-wide">
           {disabled ? "Processing…" : "Tap to scan food"}
         </Text>
       </View>
     </View>
   );
 }
-
-// ── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-
-  // ── Top Overlay ─────────────────────────────────────────────────────────
-  topOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  titleIcon: {
-    fontSize: 22,
-  },
-  titleText: {
-    color: "#22d3ee",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  topControls: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  controlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  controlButtonPressed: {
-    backgroundColor: "rgba(255,255,255,0.3)",
-  },
-  controlButtonText: {
-    fontSize: 18,
-  },
-
-  // ── Crosshair ──────────────────────────────────────────────────────────
-  crosshairContainer: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 5,
-  },
-  crosshairBox: {
-    width: 240,
-    height: 240,
-    position: "relative",
-  },
-  corner: {
-    position: "absolute",
-    width: 40,
-    height: 40,
-    borderColor: "#22d3ee",
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 12,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 12,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 12,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 12,
-  },
-  crosshairHint: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 13,
-    marginTop: 16,
-    letterSpacing: 0.3,
-  },
-
-  // ── Bottom Overlay ────────────────────────────────────────────────────
-  bottomOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 50,
-    paddingTop: 24,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  shutterOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: "rgba(255,255,255,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 4,
-  },
-  shutterInner: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shutterPressed: {
-    backgroundColor: "#22d3ee",
-  },
-  shutterDisabled: {
-    opacity: 0.5,
-  },
-  shutterDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#ef4444",
-  },
-  captureHint: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 13,
-    marginTop: 12,
-    letterSpacing: 0.3,
-  },
-});

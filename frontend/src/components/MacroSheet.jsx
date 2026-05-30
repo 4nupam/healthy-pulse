@@ -21,6 +21,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { Utensils, Flame, Beef, Wheat, Droplets, RotateCcw, AlertTriangle } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.55;
@@ -31,43 +35,56 @@ const MACRO_CARDS = [
     key: "calories",
     label: "Calories",
     unit: "kcal",
-    icon: "🔥",
+    Icon: Flame,
     field: "calories_per_100g",
-    colors: { bg: "#064e3b", text: "#6ee7b7", accent: "#10b981" },
+    gradient: ["#064e3b", "#065f46"],
+    colors: { text: "#6ee7b7", accent: "#10b981" },
   },
   {
     key: "protein",
     label: "Protein",
     unit: "g",
-    icon: "🥩",
+    Icon: Beef,
     field: "protein_per_100g",
-    colors: { bg: "#4c0519", text: "#fda4af", accent: "#f43f5e" },
+    gradient: ["#4c0519", "#881337"],
+    colors: { text: "#fda4af", accent: "#f43f5e" },
   },
   {
     key: "carbs",
     label: "Carbs",
     unit: "g",
-    icon: "🌾",
+    Icon: Wheat,
     field: "carbs_per_100g",
-    colors: { bg: "#451a03", text: "#fcd34d", accent: "#f59e0b" },
+    gradient: ["#451a03", "#78350f"],
+    colors: { text: "#fcd34d", accent: "#f59e0b" },
   },
   {
     key: "fat",
     label: "Fat",
     unit: "g",
-    icon: "💧",
+    Icon: Droplets,
     field: "fat_per_100g",
-    colors: { bg: "#0c4a6e", text: "#7dd3fc", accent: "#0ea5e9" },
+    gradient: ["#0c4a6e", "#075985"],
+    colors: { text: "#7dd3fc", accent: "#0ea5e9" },
   },
 ];
 
 export default function MacroSheet({ data, onReset, visible }) {
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const hasTriggeredHaptic = useRef(false);
 
   // ── Slide Animation ───────────────────────────────────────────────────
   useEffect(() => {
     if (visible) {
+      if (!hasTriggeredHaptic.current) {
+        // Trigger a nice success haptic slightly after the animation starts
+        setTimeout(() => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }, 100);
+        hasTriggeredHaptic.current = true;
+      }
+
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -82,6 +99,7 @@ export default function MacroSheet({ data, onReset, visible }) {
         }),
       ]).start();
     } else {
+      hasTriggeredHaptic.current = false;
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: SHEET_HEIGHT,
@@ -102,11 +120,23 @@ export default function MacroSheet({ data, onReset, visible }) {
   const { food_item, confidence, nutrition } = data;
   const confidencePercent = Math.round((confidence || 0) * 100);
 
+  // Confidence pill coloring
+  let confBg = "bg-rose-500/20";
+  let confText = "text-rose-300";
+  if (confidencePercent >= 80) {
+    confBg = "bg-emerald-500/20";
+    confText = "text-emerald-300";
+  } else if (confidencePercent >= 60) {
+    confBg = "bg-amber-500/20";
+    confText = "text-amber-300";
+  }
+
   return (
     <>
       {/* ── Backdrop ──────────────────────────────────────────────────── */}
       <Animated.View
-        style={[styles.backdrop, { opacity: fadeAnim }]}
+        className="absolute inset-0 bg-black/60 z-20"
+        style={{ opacity: fadeAnim }}
         pointerEvents={visible ? "auto" : "none"}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onReset} />
@@ -114,276 +144,123 @@ export default function MacroSheet({ data, onReset, visible }) {
 
       {/* ── Sheet ─────────────────────────────────────────────────────── */}
       <Animated.View
-        style={[
-          styles.sheet,
-          { transform: [{ translateY: slideAnim }] },
-        ]}
+        className="absolute bottom-0 left-0 right-0 h-[55%] rounded-t-3xl overflow-hidden z-30 shadow-black border-t border-l border-r border-slate-700/60"
+        style={{
+          transform: [{ translateY: slideAnim }],
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.4,
+          shadowRadius: 16,
+          elevation: 24,
+        }}
       >
-        {/* Drag Handle */}
-        <View style={styles.handleContainer}>
-          <View style={styles.handle} />
-        </View>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
+        
+        {/* Solid fallback color just in case BlurView fails */}
+        <View className="absolute inset-0 bg-scanner-bg/80" />
 
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.foodEmoji}>🍽️</Text>
-            <View>
-              <Text style={styles.foodName} numberOfLines={1}>
-                {food_item || "Unknown Food"}
+        <View className="px-5 pb-8 flex-1">
+          {/* Drag Handle */}
+          <View className="items-center py-3">
+            <View className="w-10 h-1.5 rounded-full bg-slate-500/80" />
+          </View>
+
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <View className="flex-row justify-between items-center mb-6">
+            <View className="flex-row items-center gap-3 flex-1 mr-3">
+              <View className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 items-center justify-center">
+                <Utensils size={24} color="#f8fafc" />
+              </View>
+              <View>
+                <Text className="text-scanner-text text-2xl font-extrabold tracking-wide" numberOfLines={1}>
+                  {food_item || "Unknown Food"}
+                </Text>
+                <Text className="text-scanner-muted text-xs mt-0.5 tracking-wide">
+                  per 100g serving
+                </Text>
+              </View>
+            </View>
+
+            {/* Confidence Badge */}
+            <View className={`px-3 py-1.5 rounded-full ${confBg}`}>
+              <Text className={`text-sm font-bold tracking-wide ${confText}`}>
+                {confidencePercent}% match
               </Text>
-              <Text style={styles.servingLabel}>per 100g serving</Text>
             </View>
           </View>
 
-          {/* Confidence Badge */}
-          <View
-            style={[
-              styles.confidenceBadge,
-              {
-                backgroundColor:
-                  confidencePercent >= 80
-                    ? "rgba(16,185,129,0.2)"
-                    : confidencePercent >= 60
-                    ? "rgba(245,158,11,0.2)"
-                    : "rgba(244,63,94,0.2)",
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.confidenceText,
-                {
-                  color:
-                    confidencePercent >= 80
-                      ? "#6ee7b7"
-                      : confidencePercent >= 60
-                      ? "#fcd34d"
-                      : "#fda4af",
-                },
-              ]}
+          {/* ── Macro Grid ─────────────────────────────────────────────── */}
+          {nutrition ? (
+            <View className="flex-row flex-wrap gap-3 mb-6">
+              {MACRO_CARDS.map((card) => {
+                const Icon = card.Icon;
+                return (
+                  <View
+                    key={card.key}
+                    className="w-[47%] rounded-2xl border border-white/5 overflow-hidden shadow-sm"
+                  >
+                    <LinearGradient
+                      colors={card.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      className="p-4 flex-1"
+                    >
+                      <View className="flex-row items-center gap-2 mb-2">
+                        <Icon size={16} color={card.colors.text} />
+                        <Text
+                          className="text-xs font-semibold tracking-wide uppercase"
+                          style={{ color: card.colors.text }}
+                        >
+                          {card.label}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-3xl font-extrabold tracking-tight"
+                        style={{ color: card.colors.text }}
+                      >
+                        {nutrition[card.field] ?? "—"}
+                      </Text>
+                      <Text
+                        className="text-sm font-medium mt-0.5 tracking-wide"
+                        style={{ color: card.colors.accent }}
+                      >
+                        {card.unit}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View className="flex-1 items-center justify-center py-6 mb-6">
+              <View className="w-16 h-16 rounded-full bg-slate-800/50 justify-center items-center mb-3 border border-slate-700/50">
+                <AlertTriangle size={32} color="#94a3b8" />
+              </View>
+              <Text className="text-scanner-muted text-sm text-center px-4">
+                Nutrition data not available for this item.
+              </Text>
+            </View>
+          )}
+
+          {/* ── Scan Another Button ────────────────────────────────────── */}
+          <View className="flex-1 justify-end">
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onReset();
+              }}
+              className="bg-scanner-surface/80 rounded-2xl py-4 items-center border border-scanner-border active:bg-scanner-border flex-row justify-center gap-2"
+              accessibilityLabel="Scan another food item"
+              accessibilityRole="button"
             >
-              {confidencePercent}% match
-            </Text>
+              <RotateCcw size={18} color="#22d3ee" strokeWidth={2.5} />
+              <Text className="text-scanner-accent text-base font-bold tracking-wide">
+                Scan Another
+              </Text>
+            </Pressable>
           </View>
         </View>
-
-        {/* ── Macro Grid ─────────────────────────────────────────────── */}
-        {nutrition ? (
-          <View style={styles.macroGrid}>
-            {MACRO_CARDS.map((card) => (
-              <View
-                key={card.key}
-                style={[styles.macroCard, { backgroundColor: card.colors.bg }]}
-              >
-                <View style={styles.macroCardHeader}>
-                  <Text style={styles.macroIcon}>{card.icon}</Text>
-                  <Text
-                    style={[styles.macroLabel, { color: card.colors.text }]}
-                  >
-                    {card.label}
-                  </Text>
-                </View>
-                <Text
-                  style={[styles.macroValue, { color: card.colors.text }]}
-                >
-                  {nutrition[card.field] ?? "—"}
-                </Text>
-                <Text
-                  style={[styles.macroUnit, { color: card.colors.accent }]}
-                >
-                  {card.unit}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.noNutritionContainer}>
-            <Text style={styles.noNutritionIcon}>📊</Text>
-            <Text style={styles.noNutritionText}>
-              Nutrition data not available for this item.
-            </Text>
-          </View>
-        )}
-
-        {/* ── Scan Another Button ────────────────────────────────────── */}
-        <Pressable
-          onPress={onReset}
-          style={({ pressed }) => [
-            styles.resetButton,
-            pressed && styles.resetButtonPressed,
-          ]}
-          accessibilityLabel="Scan another food item"
-          accessibilityRole="button"
-        >
-          <Text style={styles.resetButtonText}>🔄 Scan Another</Text>
-        </Pressable>
       </Animated.View>
     </>
   );
 }
-
-// ── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  // ── Backdrop ────────────────────────────────────────────────────────────
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    zIndex: 20,
-  },
-
-  // ── Sheet ───────────────────────────────────────────────────────────────
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SHEET_HEIGHT,
-    backgroundColor: "#0f172a",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingBottom: 34,
-    zIndex: 30,
-    // iOS shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    // Android elevation
-    elevation: 24,
-    // Glassmorphism border
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "rgba(51,65,85,0.6)",
-  },
-
-  // ── Handle ──────────────────────────────────────────────────────────────
-  handleContainer: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#475569",
-  },
-
-  // ── Header ──────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-    marginRight: 12,
-  },
-  foodEmoji: {
-    fontSize: 32,
-  },
-  foodName: {
-    color: "#f8fafc",
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-  servingLabel: {
-    color: "#94a3b8",
-    fontSize: 12,
-    marginTop: 2,
-    letterSpacing: 0.2,
-  },
-  confidenceBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  confidenceText: {
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-
-  // ── Macro Grid ──────────────────────────────────────────────────────────
-  macroGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 24,
-  },
-  macroCard: {
-    width: "47%",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  macroCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  macroIcon: {
-    fontSize: 16,
-  },
-  macroLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
-  },
-  macroValue: {
-    fontSize: 32,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  macroUnit: {
-    fontSize: 13,
-    fontWeight: "500",
-    marginTop: 2,
-    letterSpacing: 0.2,
-  },
-
-  // ── No Nutrition ────────────────────────────────────────────────────────
-  noNutritionContainer: {
-    alignItems: "center",
-    paddingVertical: 24,
-    marginBottom: 24,
-  },
-  noNutritionIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  noNutritionText: {
-    color: "#94a3b8",
-    fontSize: 14,
-    textAlign: "center",
-  },
-
-  // ── Reset Button ────────────────────────────────────────────────────────
-  resetButton: {
-    backgroundColor: "#1e293b",
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  resetButtonPressed: {
-    backgroundColor: "#334155",
-  },
-  resetButtonText: {
-    color: "#22d3ee",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-  },
-});

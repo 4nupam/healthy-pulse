@@ -5,6 +5,7 @@
  * API communication, loading states, and result display.
  */
 
+import "./global.css";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,11 +14,12 @@ import {
   Pressable,
   SafeAreaView,
   StatusBar,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useCameraPermissions } from "expo-camera";
+import { Camera, AlertCircle, Unlock } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 
 import CameraView from "./src/components/CameraView";
 import MacroSheet from "./src/components/MacroSheet";
@@ -103,6 +105,7 @@ export default function App() {
 
   // ── Handle Permission Request ─────────────────────────────────────────
   const handleRequestPermission = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const result = await requestPermission();
       if (!result.granted) {
@@ -181,31 +184,29 @@ export default function App() {
   // ── Render: Loading Skeleton ──────────────────────────────────────────
   if (permState === PermState.LOADING) {
     return (
-      <SafeAreaView style={styles.fullScreen}>
+      <SafeAreaView className="flex-1 bg-scanner-bg">
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-        <View style={styles.centeredContainer}>
-          <Animated.Text
-            style={[styles.loadingIcon, { opacity: pulseAnim }]}
-          >
-            🔬
-          </Animated.Text>
-          <Text style={styles.loadingTitle}>Antigravity</Text>
-          <Text style={styles.loadingSubtitle}>
+        <View className="flex-1 justify-center items-center px-8">
+          <Animated.View style={{ opacity: pulseAnim }} className="mb-4">
+            <Camera size={64} color="#22d3ee" strokeWidth={1.5} />
+          </Animated.View>
+          <Text className="text-scanner-accent text-3xl font-extrabold tracking-widest mb-2">
+            ANTIGRAVITY
+          </Text>
+          <Text className="text-scanner-muted text-sm tracking-wide mb-8">
             Initializing food scanner…
           </Text>
 
           {/* Skeleton bars */}
-          <View style={styles.skeletonContainer}>
+          <View className="w-full gap-3 items-center">
             {[0.8, 0.6, 0.4].map((width, i) => (
               <Animated.View
                 key={i}
-                style={[
-                  styles.skeletonBar,
-                  {
-                    width: `${width * 100}%`,
-                    opacity: pulseAnim,
-                  },
-                ]}
+                className="h-3 rounded-full bg-scanner-surface"
+                style={{
+                  width: `${width * 100}%`,
+                  opacity: pulseAnim,
+                }}
               />
             ))}
           </View>
@@ -217,34 +218,34 @@ export default function App() {
   // ── Render: Permission Denied CTA ─────────────────────────────────────
   if (permState === PermState.DENIED) {
     return (
-      <SafeAreaView style={styles.fullScreen}>
+      <SafeAreaView className="flex-1 bg-scanner-bg">
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-        <View style={styles.centeredContainer}>
-          <View style={styles.deniedIconContainer}>
-            <Text style={styles.deniedIcon}>📸</Text>
+        <View className="flex-1 justify-center items-center px-8">
+          <View className="w-24 h-24 rounded-full bg-scanner-accent/10 border-2 border-scanner-accent/20 justify-center items-center mb-6">
+            <AlertCircle size={44} color="#22d3ee" />
           </View>
 
-          <Text style={styles.deniedTitle}>Camera Access Needed</Text>
-          <Text style={styles.deniedSubtitle}>
+          <Text className="text-scanner-text text-2xl font-extrabold tracking-wide mb-3 text-center">
+            Camera Access Needed
+          </Text>
+          <Text className="text-scanner-muted text-base leading-6 text-center mb-8 px-2">
             Antigravity Food Scanner uses your camera to identify food
             items and show their nutritional information in real time.
           </Text>
 
           <Pressable
             onPress={handleRequestPermission}
-            style={({ pressed }) => [
-              styles.grantButton,
-              pressed && styles.grantButtonPressed,
-            ]}
+            className="bg-scanner-accent py-4 px-10 rounded-2xl mb-6 shadow-lg shadow-scanner-accent/30 active:scale-95 active:bg-cyan-500 flex-row items-center gap-3"
             accessibilityLabel="Grant camera access"
             accessibilityRole="button"
           >
-            <Text style={styles.grantButtonText}>
-              🔓 Grant Camera Access
+            <Unlock size={20} color="#0f172a" strokeWidth={2.5} />
+            <Text className="text-scanner-bg text-base font-extrabold tracking-wide">
+              Grant Camera Access
             </Text>
           </Pressable>
 
-          <Text style={styles.deniedHint}>
+          <Text className="text-slate-500 text-xs text-center tracking-wide">
             Your camera feed is processed locally and never stored.
           </Text>
         </View>
@@ -254,7 +255,7 @@ export default function App() {
 
   // ── Render: Main Scanner ──────────────────────────────────────────────
   return (
-    <View style={styles.fullScreen}>
+    <View className="flex-1 bg-black">
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* Camera */}
@@ -262,24 +263,24 @@ export default function App() {
 
       {/* Processing Overlay */}
       {isProcessing && (
-        <View style={styles.processingOverlay}>
-          <View style={styles.processingCard}>
-            <Animated.Text
-              style={[
-                styles.processingSpinner,
-                { transform: [{ rotate: spinInterpolate }] },
-              ]}
+        <View className="absolute inset-0 bg-black/75 justify-center items-center z-15">
+          <View className="bg-scanner-surface rounded-3xl p-8 items-center min-w-[220px] border border-scanner-border shadow-2xl shadow-black/40">
+            <Animated.View
+              style={{ transform: [{ rotate: spinInterpolate }] }}
+              className="mb-4"
             >
-              🔬
-            </Animated.Text>
-            <Text style={styles.processingTitle}>Analyzing Food</Text>
-            <Text style={styles.processingSubtitle}>
+              <Camera size={48} color="#22d3ee" strokeWidth={1} />
+            </Animated.View>
+            <Text className="text-scanner-text text-lg font-bold mb-1">
+              Analyzing Food
+            </Text>
+            <Text className="text-scanner-muted text-sm tracking-wide">
               Running AI detection…
             </Text>
             <ActivityIndicator
               size="small"
               color="#22d3ee"
-              style={styles.processingIndicator}
+              className="mt-5"
             />
           </View>
         </View>
@@ -294,151 +295,3 @@ export default function App() {
     </View>
   );
 }
-
-// ── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  fullScreen: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-  },
-
-  // ── Centered Layout ───────────────────────────────────────────────────
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-
-  // ── Loading Skeleton ──────────────────────────────────────────────────
-  loadingIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  loadingTitle: {
-    color: "#22d3ee",
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  loadingSubtitle: {
-    color: "#94a3b8",
-    fontSize: 14,
-    letterSpacing: 0.3,
-    marginBottom: 32,
-  },
-  skeletonContainer: {
-    width: "100%",
-    gap: 12,
-    alignItems: "center",
-  },
-  skeletonBar: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#1e293b",
-  },
-
-  // ── Denied CTA ────────────────────────────────────────────────────────
-  deniedIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "rgba(34,211,238,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: "rgba(34,211,238,0.2)",
-  },
-  deniedIcon: {
-    fontSize: 44,
-  },
-  deniedTitle: {
-    color: "#f8fafc",
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  deniedSubtitle: {
-    color: "#94a3b8",
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-    marginBottom: 32,
-    paddingHorizontal: 8,
-  },
-  grantButton: {
-    backgroundColor: "#22d3ee",
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 16,
-    marginBottom: 24,
-    // Shadow
-    shadowColor: "#22d3ee",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  grantButtonPressed: {
-    backgroundColor: "#06b6d4",
-    transform: [{ scale: 0.97 }],
-  },
-  grantButtonText: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  deniedHint: {
-    color: "#475569",
-    fontSize: 12,
-    textAlign: "center",
-    letterSpacing: 0.2,
-  },
-
-  // ── Processing Overlay ────────────────────────────────────────────────
-  processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 15,
-  },
-  processingCard: {
-    backgroundColor: "#1e293b",
-    borderRadius: 24,
-    padding: 32,
-    alignItems: "center",
-    minWidth: 200,
-    borderWidth: 1,
-    borderColor: "#334155",
-    // Shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  processingSpinner: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  processingTitle: {
-    color: "#f8fafc",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  processingSubtitle: {
-    color: "#94a3b8",
-    fontSize: 13,
-    letterSpacing: 0.2,
-  },
-  processingIndicator: {
-    marginTop: 16,
-  },
-});

@@ -2,25 +2,23 @@
 Antigravity Food Scanner — FastAPI Application Entry Point
 ============================================================
 Central API server with CORS, exception handling, seed data,
-and the /api/v1/scan inference endpoint.
+and the /api/v1 router.
 """
 
 import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
-import cv2
-import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import dispose_engine, get_db, init_db, async_session_factory
+from app.database import dispose_engine, init_db, async_session_factory
 from app.models import NutritionCatalog
 from app.services.ai_engine import detector
+from app.api.endpoints.scan import router as scan_router
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -70,22 +68,12 @@ SEED_DATA: list[dict[str, Any]] = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle handler."""
-    # ── Startup ──────────────────────────────────────────────────────────
     logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
-
-    # Initialize database tables
     await init_db()
-
-    # Seed nutrition catalog if empty
     await _seed_nutrition_data()
-
-    # Load the YOLO model into GPU/CPU memory
     detector.load_model()
-
     logger.info("Application startup complete.")
     yield
-
-    # ── Shutdown ─────────────────────────────────────────────────────────
     await dispose_engine()
     logger.info("Application shutdown complete.")
 
@@ -93,20 +81,15 @@ async def lifespan(app: FastAPI):
 async def _seed_nutrition_data() -> None:
     """Insert seed nutrition records if the catalog table is empty."""
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(NutritionCatalog).limit(1)
-        )
+        result = await session.execute(select(NutritionCatalog).limit(1))
         if result.scalars().first() is not None:
             logger.info("Nutrition catalog already seeded — skipping.")
             return
 
         for item in SEED_DATA:
             session.add(NutritionCatalog(**item))
-
         await session.commit()
-        logger.info(
-            "Seeded %d items into nutrition_catalog.", len(SEED_DATA)
-        )
+        logger.info("Seeded %d items into nutrition_catalog.", len(SEED_DATA))
 
 
 # ── FastAPI App ──────────────────────────────────────────────────────────────
@@ -126,11 +109,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # ── Global Exception Handler ────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc: Exception):
-    """Catch-all handler that returns structured JSON for unhandled errors."""
     logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,
@@ -141,150 +122,14 @@ async def global_exception_handler(request, exc: Exception):
         },
     )
 
+# ── Routes ───────────────────────────────────────────────────────────────────
+app.include_router(scan_router, prefix="/api/v1")
 
-# ── Health Check ─────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health_check() -> Dict[str, Any]:
-    """Return server health status and model readiness."""
     return {
         "status": "healthy",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "model_loaded": detector.is_ready,
     }
-
-
-# ── Scan Endpoint ────────────────────────────────────────────────────────────
-@app.post("/api/v1/scan", tags=["Scanner"])
-async def scan_food(
-    file: UploadFile = File(..., description="Food image to analyze"),
-    db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
-    """
-    Accept a food image, run YOLO11 inference, look up nutrition data,
-    and return structured macro information.
-
-    Pipeline
-    --------
-    1. Validate uploaded file is an image.
-    2. Read bytes into memory (no disk I/O).
-    3. Decode via OpenCV.
-    4. Run YOLO11 inference.
-    5. Query nutrition catalog.
-    6. Return structured JSON response.
-    """
-
-    # ── 1. Validate Content-Type ─────────────────────────────────────────
-    content_type = file.content_type or ""
-    if not content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "message": f"Invalid file type '{content_type}'. Please upload an image (JPEG, PNG, etc.).",
-            },
-        )
-
-    # ── 2. Read bytes into memory buffer ─────────────────────────────────
-    try:
-        image_bytes = await file.read()
-        if len(image_bytes) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail={"success": False, "message": "Uploaded file is empty."},
-            )
-
-        # Cap file size at 20 MB
-        if len(image_bytes) > 20 * 1024 * 1024:
-            raise HTTPException(
-                status_code=413,
-                detail={
-                    "success": False,
-                    "message": "Image too large. Maximum size is 20 MB.",
-                },
-            )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Failed to read uploaded file: %s", exc)
-        raise HTTPException(
-            status_code=400,
-            detail={"success": False, "message": "Failed to read the uploaded file."},
-        )
-
-    # ── 3. Decode via OpenCV ─────────────────────────────────────────────
-    try:
-        np_buffer = np.frombuffer(image_bytes, dtype=np.uint8)
-        image_matrix = cv2.imdecode(np_buffer, cv2.IMREAD_COLOR)
-
-        if image_matrix is None:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "success": False,
-                    "message": "Could not decode the image. Ensure it is a valid JPEG or PNG.",
-                },
-            )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("OpenCV decode failure: %s", exc)
-        raise HTTPException(
-            status_code=400,
-            detail={"success": False, "message": "Image decoding failed."},
-        )
-
-    # ── 4. Run YOLO11 Inference ──────────────────────────────────────────
-    if not detector.is_ready:
-        return {
-            "success": False,
-            "message": "The AI model is not currently loaded. Please contact the administrator.",
-        }
-
-    detection = detector.run_inference(image_matrix)
-
-    if detection is None:
-        return {
-            "success": False,
-            "message": "No food item detected with sufficient confidence. Please try a clearer photo.",
-        }
-
-    # ── 5. Query Nutrition Catalog ───────────────────────────────────────
-    try:
-        result = await db.execute(
-            select(NutritionCatalog).where(
-                NutritionCatalog.model_label == detection.label
-            )
-        )
-        catalog_entry = result.scalars().first()
-    except Exception as exc:
-        logger.error("Database query failed: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "success": False,
-                "message": "Database lookup failed. Please try again.",
-            },
-        )
-
-    if catalog_entry is None:
-        return {
-            "success": True,
-            "food_item": detection.label.replace("_", " ").title(),
-            "confidence": round(detection.confidence, 3),
-            "nutrition": None,
-            "message": f"Detected '{detection.label}' but no nutrition data is available in the catalog.",
-        }
-
-    # ── 6. Return Structured Response ────────────────────────────────────
-    response_data = catalog_entry.to_dict()
-    response_data["success"] = True
-    response_data["confidence"] = round(detection.confidence, 3)
-
-    logger.info(
-        "Scan complete: %s (%.1f%% confidence)",
-        detection.label,
-        detection.confidence * 100,
-    )
-
-    return response_data
